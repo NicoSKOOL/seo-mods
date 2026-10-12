@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { bareDomain, latestAiCitations, trackedMovement, weekOverWeek } from '../hooks/register.tsx'
+import { bareDomain, latestAiCitations, pickProperty, trackedMovement, weekOverWeek } from '../hooks/register.tsx'
 
 const days = (start: number, clicks: number[]) =>
   clicks.map((c, i) => ({ date: `2026-10-${String(start + i).padStart(2, '0')}`, clicks: c, impressions: c * 30 }))
@@ -77,6 +77,16 @@ test('reads AI citations from the latest check only', () => {
 test('normalizes Search Console property names to a bare domain', () => {
   expect(bareDomain('sc-domain:AcmeDental.com')).toBe('acmedental.com')
   expect(bareDomain('https://www.acmedental.com/blog/')).toBe('acmedental.com')
+})
+
+test('prefers the domain property over a more recently synced URL-prefix property', () => {
+  const properties = [
+    { id: 'domain', site_url: 'sc-domain:airankingskool.com', kind: 'gsc', is_enabled: 1, last_synced_at: '2026-10-10 21:30:40' },
+    { id: 'www', site_url: 'https://www.airankingskool.com/', kind: 'gsc', is_enabled: 1, last_synced_at: '2026-10-12 01:55:42' },
+    { id: 'other', site_url: 'sc-domain:example.com', kind: 'gsc', is_enabled: 1, last_synced_at: '2026-10-12 09:00:00' },
+  ]
+  expect(pickProperty(properties, 'airankingskool.com')?.id).toBe('domain')
+  expect(pickProperty(properties.slice(1), 'airankingskool.com')?.id).toBe('www')
 })
 
 test('/pulse loads a client and the band shows its numbers on every surface', async ($, on) => {

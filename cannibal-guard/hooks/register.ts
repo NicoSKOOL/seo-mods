@@ -118,14 +118,17 @@ async function indexLocalPages($: EngineInterface, root: string, dirs: string[])
 async function searchData($: EngineInterface, config: Config): Promise<{ queries: Row[]; ranked: Row[] }> {
   const domain = config.domain
   if (domain === null) return { queries: [], ranked: [] }
-  const cacheKey = `search:${domain}`
+  const cacheKey = `search:v2:${domain}`
   const cached = (await $.store.get(cacheKey)) as { at: number; queries: Row[]; ranked: Row[] } | undefined
   if (cached !== undefined && (await $.clock.now()) - cached.at < DAY_MS) return cached
 
   let queries: Row[] = []
   try {
     const { properties = [] } = await datawise($, config.server, 'datawise_search_console', { action: 'list_properties' })
-    const property = (properties as Row[]).find(row => row.kind === 'gsc' && row.is_enabled && bareDomain(row.site_url) === domain)
+    // A domain property (sc-domain:) covers every version of the site, so it wins.
+    const property = (properties as Row[])
+      .filter(row => row.kind === 'gsc' && row.is_enabled && bareDomain(row.site_url) === domain)
+      .sort((a, b) => Number(String(b.site_url).startsWith('sc-domain:')) - Number(String(a.site_url).startsWith('sc-domain:')))[0]
     if (property !== undefined) {
       const result = await datawise($, config.server, 'datawise_search_console', {
         action: 'queries',

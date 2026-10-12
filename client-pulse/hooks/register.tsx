@@ -73,6 +73,23 @@ export function latestAiCitations(trend: Row[]) {
   }
 }
 
+/**
+ * The Search Console property to read for a domain: a domain property
+ * (sc-domain:) covers every protocol and subdomain, so it beats any URL-prefix
+ * one; then enabled before disabled, then the most recently synced.
+ */
+export function pickProperty(properties: Row[], domain: string): Row | undefined {
+  const rank = (row: Row) => [String(row.site_url).startsWith('sc-domain:') ? 1 : 0, Number(row.is_enabled) ? 1 : 0]
+
+  return properties
+    .filter(row => row.kind === 'gsc' && bareDomain(row.site_url) === domain)
+    .sort((a, b) => {
+      const [aDomain, aEnabled] = rank(a)
+      const [bDomain, bEnabled] = rank(b)
+      return bDomain! - aDomain! || bEnabled! - aEnabled! || String(b.last_synced_at ?? '').localeCompare(String(a.last_synced_at ?? ''))
+    })[0]
+}
+
 async function datawise($: EngineInterface, server: string, tool: string, args: Row): Promise<Row> {
   const result = await $.mcp.call(server, tool, args)
   const text = result.content.find(block => block.type === 'text')?.text ?? ''
@@ -95,9 +112,7 @@ async function fetchPulse($: EngineInterface, config: Config): Promise<Pulse> {
   const { properties = [] } = await datawise($, server, 'datawise_search_console', {
     action: 'list_properties',
   })
-  const property = (properties as Row[])
-    .filter(row => row.kind === 'gsc' && bareDomain(row.site_url) === domain)
-    .sort((a, b) => Number(b.is_enabled) - Number(a.is_enabled) || String(b.last_synced_at ?? '').localeCompare(String(a.last_synced_at ?? '')))[0]
+  const property = pickProperty(properties as Row[], domain)
   if (property === undefined) throw new Error(`no Search Console property for ${domain} in DataWise`)
 
   const { overview } = await datawise($, server, 'datawise_search_console', {
@@ -146,7 +161,7 @@ async function fetchPulse($: EngineInterface, config: Config): Promise<Pulse> {
 }
 
 async function refresh($: EngineInterface, config: Config, isForced: boolean): Promise<PulseStatus> {
-  const cacheKey = `pulse:${config.domain}`
+  const cacheKey = `pulse:v2:${config.domain}`
   const cached = (await $.store.get(cacheKey)) as Pulse | undefined
   const isFresh = cached !== undefined && (await $.clock.now()) - cached.fetchedAt < MAX_AGE_MS
 
