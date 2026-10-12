@@ -1,0 +1,11 @@
+{
+  "name": "client-pulse",
+  "version": "0.1.0",
+  "description": "Shows a client's live Search Console, rank tracking and AI visibility numbers from DataWise above the prompt.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Nico Gorrono",
+    "url": "https://www.airankingskool.com"
+  },
+  "homepage": "https://github.com/NicoSKOOL/seo-mods"
+}

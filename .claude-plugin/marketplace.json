@@ -1,0 +1,8 @@
+{
+  "name": "seo-mods",
+  "owner": { "name": "Nico Gorrono", "url": "https://www.airankingskool.com" },
+  "plugins": [
+    { "name": "client-pulse", "source": "./client-pulse", "description": "Live Search Console, rank tracking and AI visibility numbers from DataWise above the prompt." },
+    { "name": "cannibal-guard", "source": "./cannibal-guard", "description": "Stops Claude from creating a page for a keyword your site already covers or ranks for." }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "cannibal-guard",
+  "version": "0.1.0",
+  "description": "Stops Claude from creating a new page whose target keyword an existing page already covers or ranks for (local pages + DataWise).",
+  "author": {
+    "name": "Nico Gorrono",
+    "url": "https://www.airankingskool.com"
+  },
+  "homepage": "https://github.com/NicoSKOOL/seo-mods"
+}
