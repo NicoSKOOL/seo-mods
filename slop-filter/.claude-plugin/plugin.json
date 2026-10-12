@@ -1,0 +1,7 @@
+{
+  "name": "slop-filter",
+  "version": "0.1.0",
+  "description": "Blocks AI slop in website copy: scores every page Claude writes for AI tells and SEO cliches (English and Spanish) and makes Claude rewrite it.",
+  "author": { "name": "Nico Gorrono", "url": "https://www.airankingskool.com" },
+  "homepage": "https://github.com/NicoSKOOL/seo-mods"
+}

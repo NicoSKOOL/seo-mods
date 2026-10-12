@@ -1,11 +1,12 @@
 # SEO Mods for Claude Code
 
-Two Claude Code mods that give Claude live access to your rankings while it works.
+Three Claude Code mods for SEO work: live rankings while Claude works, a guard against keyword cannibalization, and a filter that keeps AI slop off your pages.
 
 - **Client Pulse:** a band above the prompt showing the client's Search Console clicks and impressions (week over week), tracked keyword movement, AI citations and the top opportunity query.
 - **Cannibalization Guard:** stops Claude from creating a new page for a keyword your site already covers or ranks for, and tells it to improve the existing page instead.
+- **Slop Filter:** scores every page Claude writes for AI tells and SEO cliches ("look no further", "nestled in the heart of", "it's not just X, it's Y"), in English and Spanish, and makes Claude rewrite anything that reads like AI. No data source needed, no tokens used.
 
-Both read their data from [DataWise SEO](https://www.datawiseseo.com/) through its Claude connector.
+Client Pulse and Cannibalization Guard read their data from [DataWise SEO](https://www.datawiseseo.com/) through its Claude connector.
 
 ## Requirements
 
@@ -20,6 +21,7 @@ In a Claude Code terminal session:
 ```
 /plugin install client-pulse --marketplace NicoSKOOL/seo-mods
 /plugin install cannibal-guard --marketplace NicoSKOOL/seo-mods
+/plugin install slop-filter --marketplace NicoSKOOL/seo-mods
 ```
 
 Answer `y` to add the marketplace, then choose the user scope.
@@ -67,3 +69,40 @@ Add this line to your project's CLAUDE.md so every new page gets one:
 > Every new page gets a `keyword:` field in its frontmatter with its primary target keyword.
 
 When the Guard blocks a page, Claude explains what already covers the keyword. If you still want the new page, tell Claude, and it adds `cannibalization: ok` to the frontmatter.
+
+## Using Slop Filter
+
+It works out of the box. Every time Claude writes or edits website copy (`.astro`, `.html`, `.mdx`, and `.md` inside your content folders), the filter scores the new text from 0 to 100:
+
+- **Always blocked:** leftover chatbot text ("Here's the revised version"), citation junk (`oaicite`, `utm_source=chatgpt.com`) and unfilled placeholders like `[Your Phone Number]`.
+- **Blocked when it piles up:** AI vocabulary (delve, tapestry, nestled, vibrant), stock openers ("In today's fast-paced world"), SEO cliches ("look no further", "your trusted partner", "seamless"), "it's not just X, it's Y", "In conclusion" sections, and in Spanish "cabe destacar", "juega un papel fundamental" and Title Case Headings. One "crucial" proves nothing, so a page is only blocked when the score drops under 60 and at least 3 different tells show up.
+
+When it blocks, Claude gets the list of tells with examples and rewrites the copy. The status line shows each page's score. If Claude cannot get a page under the bar in two tries, the third write goes through with a warning, so it never loops.
+
+Tune it under `slop` in `.seo-client.json`:
+
+```json
+{
+  "slop": {
+    "threshold": 60,
+    "minTells": 3,
+    "mode": "block",
+    "banned": ["leading provider", "state-of-the-art"],
+    "allow": ["Heart of Texas"],
+    "emDash": "block"
+  }
+}
+```
+
+| Field | What it does |
+| --- | --- |
+| `threshold` | Score below which a page is blocked (default 60) |
+| `minTells` | Different tells needed before a block (default 3) |
+| `mode` | `warn` writes the page and only flags it to Claude |
+| `banned` | Your own phrases that always block |
+| `allow` | Names or phrases never to flag (a business name like "Vibrant Smiles") |
+| `emDash` | `block`, `count` (default) or `off` |
+
+To publish a page anyway, tell Claude, and it adds `slop: ok` to the frontmatter.
+
+Patterns draw on Wikipedia's [Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), [slop-score](https://github.com/sam-paech/slop-score) and [slop-guard](https://github.com/eric-tramel/slop-guard).

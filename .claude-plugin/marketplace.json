@@ -1,8 +1,25 @@
 {
   "name": "seo-mods",
-  "owner": { "name": "Nico Gorrono", "url": "https://www.airankingskool.com" },
+  "owner": {
+    "name": "Nico Gorrono",
+    "url": "https://www.airankingskool.com"
+  },
   "plugins": [
-    { "name": "client-pulse", "source": "./client-pulse", "description": "Live Search Console, rank tracking and AI visibility numbers from DataWise above the prompt." },
-    { "name": "cannibal-guard", "source": "./cannibal-guard", "description": "Stops Claude from creating a page for a keyword your site already covers or ranks for." }
-  ]
+    {
+      "name": "client-pulse",
+      "source": "./client-pulse",
+      "description": "Live Search Console, rank tracking and AI visibility numbers from DataWise above the prompt."
+    },
+    {
+      "name": "cannibal-guard",
+      "source": "./cannibal-guard",
+      "description": "Stops Claude from creating a page for a keyword your site already covers or ranks for."
+    },
+    {
+      "name": "slop-filter",
+      "source": "./slop-filter",
+      "description": "Blocks AI slop and SEO cliches in website copy (English and Spanish) and makes Claude rewrite it."
+    }
+  ],
+  "description": "Claude Code mods for SEO work: live rankings, a keyword cannibalization guard and an AI slop filter."
 }
