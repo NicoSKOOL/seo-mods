@@ -3,6 +3,9 @@ export type Pulse = {
   /** Last date Search Console data covers (YYYY-MM-DD). */
   syncedTo: string | null
   clicks7: number
+  /** Daily clicks and impressions, oldest first, for the sparklines (up to 14 days). */
+  clicksDaily: number[]
+  impressionsDaily: number[]
   clicksDelta: number | null
   impressions7: number
   impressionsDelta: number | null

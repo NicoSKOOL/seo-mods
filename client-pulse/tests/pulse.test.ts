@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { bareDomain, latestAiCitations, pickProperty, trackedMovement, weekOverWeek } from '../hooks/register.tsx'
+import { bareDomain, latestAiCitations, pickProperty, sparkline, trackedMovement, weekOverWeek } from '../hooks/register.tsx'
 
 const days = (start: number, clicks: number[]) =>
   clicks.map((c, i) => ({ date: `2026-10-${String(start + i).padStart(2, '0')}`, clicks: c, impressions: c * 30 }))
@@ -79,6 +79,12 @@ test('normalizes Search Console property names to a bare domain', () => {
   expect(bareDomain('https://www.acmedental.com/blog/')).toBe('acmedental.com')
 })
 
+test('draws a sparkline scaled to the series', () => {
+  expect(sparkline([0, 7, 14])).toBe('▁▅█')
+  expect(sparkline([5, 5])).toBe('▄▄')
+  expect(sparkline([])).toBe('')
+})
+
 test('prefers the domain property over a more recently synced URL-prefix property', () => {
   const properties = [
     { id: 'domain', site_url: 'sc-domain:airankingskool.com', kind: 'gsc', is_enabled: 1, last_synced_at: '2026-10-10 21:30:40' },
@@ -100,14 +106,20 @@ test('/pulse loads a client and the band shows its numbers on every surface', as
   expect((answer as { text?: string }).text).toMatch(/tracked 2\/3 ranking \(1 up, 1 down\)/)
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({
-      plugin: 'client-pulse',
-      surface,
-      component: 'AbovePrompt',
-      props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 140 },
-    } as never)
-    expect(await ui.find({ type: 'Text', text: /acmedental\.com/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /\+20%/ })).toBeDefined()
-    await ui.unmount()
+    for (const size of [{ maxRows: 12, bodyColumns: 140 }, { maxRows: 12, bodyColumns: 70 }]) {
+      const ui = await $.ui.mount({
+        plugin: 'client-pulse',
+        surface,
+        component: 'AbovePrompt',
+        props: { hasSurvey: false, isWorking: false, ...size },
+      } as never)
+      expect(await ui.find({ type: 'Text', text: /acmedental\.com/ })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /▲ 20%/ })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /uf to clp/ })).toBeDefined()
+      if (size.bodyColumns === 140) expect(await ui.find({ type: 'Text', text: /TRACKED KEYWORDS/ })).toBeDefined()
+      await ui.press({ key: 'hide' })
+      await ui.unmount()
+      await $.command.run({ command: 'pulse', args: '' } as never)
+    }
   }
 })

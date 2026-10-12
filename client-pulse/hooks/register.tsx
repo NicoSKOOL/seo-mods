@@ -38,6 +38,8 @@ export function weekOverWeek(daily: { date: string; clicks: number; impressions:
 
   return {
     syncedTo: last.at(-1)?.date ?? null,
+    clicksDaily: sorted.slice(-14).map(row => row.clicks ?? 0),
+    impressionsDaily: sorted.slice(-14).map(row => row.impressions ?? 0),
     clicks7: sum(last, 'clicks'),
     clicksDelta: prev.length === 7 ? percentChange(sum(last, 'clicks'), sum(prev, 'clicks')) : null,
     impressions7: sum(last, 'impressions'),
@@ -161,7 +163,7 @@ async function fetchPulse($: EngineInterface, config: Config): Promise<Pulse> {
 }
 
 async function refresh($: EngineInterface, config: Config, isForced: boolean): Promise<PulseStatus> {
-  const cacheKey = `pulse:v2:${config.domain}`
+  const cacheKey = `pulse:v3:${config.domain}`
   const cached = (await $.store.get(cacheKey)) as Pulse | undefined
   const isFresh = cached !== undefined && (await $.clock.now()) - cached.fetchedAt < MAX_AGE_MS
 
@@ -180,6 +182,22 @@ async function refresh($: EngineInterface, config: Config, isForced: boolean): P
     if (cached === undefined) await update($, status, () => next)
     return next
   }
+}
+
+const SPARK = '▁▂▃▄▅▆▇█'
+
+/** A one-line bar chart of a series, scaled between its own min and max. */
+export function sparkline(values: number[] | undefined): string {
+  if (!values || values.length === 0) return ''
+  const min = Math.min(...values)
+  const span = Math.max(...values) - min
+  return values.map(v => SPARK[span === 0 ? 3 : Math.round(((v - min) / span) * (SPARK.length - 1))]).join('')
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const shortDate = (iso: string) => {
+  const [, month, day] = iso.split('-').map(Number)
+  return month && day ? `${MONTHS[month - 1]} ${day}` : iso
 }
 
 const signed = (n: number | null) => (n === null ? '' : ` (${n > 0 ? '+' : ''}${n}%)`)
@@ -241,67 +259,132 @@ export const register: Register = on => {
     if (e.props.hasSurvey || current.kind === 'idle' || (await read($, isHidden))) return next(e)
 
     const { Box, Button, Text } = $.ui.resolve(e)
-    const hide = <Button key="hide" plain label="×" onPress={() => update($, isHidden, () => true)} />
+    const isWide = e.props.bodyColumns >= 96 && e.props.maxRows >= 7
+    const reload = config
+    const controls = (
+      <Box gap={1}>
+        {reload !== null && (
+          <Button key="refresh" plain label="↻" onPress={() => void refresh($, reload, true)} />
+        )}
+        <Button key="hide" plain role="dismiss" label="×" onPress={() => update($, isHidden, () => true)} />
+      </Box>
+    )
+    const header = (domain: string, note: string) => (
+      <Box justifyContent="space-between">
+        <Text>
+          <Text color="claude">◆ </Text>
+          <Text bold>{domain}</Text>
+        </Text>
+        <Box gap={2}>
+          <Text color="subtle">{note}</Text>
+          {controls}
+        </Box>
+      </Box>
+    )
+    const card = (children: unknown) => (
+      <Box flexDirection="column" borderStyle="round" borderColor="promptBorder" paddingX={1}>
+        {children as never}
+      </Box>
+    )
 
     if (current.kind === 'loading') {
-      return (
-        <Box>
-          <Text dimColor>◆ {current.domain}: loading DataWise… </Text>
-        </Box>
-      )
+      return card(header(current.domain, 'loading from DataWise…'))
     }
     if (current.kind === 'error') {
-      return (
-        <Box>
-          <Text color="red">◆ {current.domain}: {current.message} </Text>
-          {hide}
-        </Box>
+      return card(
+        <Box flexDirection="column">
+          {header(current.domain, 'DataWise')}
+          <Text color="error">{current.message}</Text>
+        </Box>,
       )
     }
 
     const pulse = current.pulse
-    const trend = (n: number | null) =>
-      n === null ? null : (
-        <Text color={n > 0 ? 'green' : n < 0 ? 'red' : undefined}>{signed(n)}</Text>
+    const note = `Search Console via DataWise${pulse.syncedTo ? ` · data to ${shortDate(pulse.syncedTo)}` : ''}`
+    const delta = (n: number | null, isInverted = false) => {
+      if (n === null) return null
+      const isGood = isInverted ? n < 0 : n > 0
+      return (
+        <Text color={n === 0 ? 'subtle' : isGood ? 'success' : 'error'}>
+          {' '}
+          {n > 0 ? '▲' : n < 0 ? '▼' : '•'} {Math.abs(n)}%
+        </Text>
       )
+    }
+    const opportunity = pulse.topOpportunity && (
+      <Text wrap="truncate-end">
+        <Text color="suggestion">→ </Text>
+        <Text color="subtle">Top opportunity </Text>
+        <Text bold>"{pulse.topOpportunity.query}"</Text>
+        <Text color="subtle">
+          {' '}
+          ranks #{Math.round(pulse.topOpportunity.position)} with {compact(pulse.topOpportunity.impressions)} impressions
+        </Text>
+      </Text>
+    )
 
-    return (
-      <Box flexDirection="column">
-        <Box>
-          <Text bold color="cyan">◆ {pulse.domain} </Text>
-          <Text>  clicks 7d </Text>
-          <Text bold>{compact(pulse.clicks7)}</Text>
-          {trend(pulse.clicksDelta)}
-          <Text>  impr </Text>
-          <Text bold>{compact(pulse.impressions7)}</Text>
-          {trend(pulse.impressionsDelta)}
-          {pulse.avgPosition !== null && <Text>  avg pos {pulse.avgPosition}</Text>}
-          <Text> </Text>
-          {hide}
-        </Box>
-        <Box>
-          {pulse.tracked && (
-            <Text>
-              <Text dimColor>  tracked </Text>
-              {pulse.tracked.ranking}/{pulse.tracked.total}
-              {pulse.tracked.up > 0 && <Text color="green"> ▲{pulse.tracked.up}</Text>}
-              {pulse.tracked.down > 0 && <Text color="red"> ▼{pulse.tracked.down}</Text>}
-            </Text>
-          )}
-          {pulse.aiCited && (
-            <Text>
-              <Text dimColor>  AI cited </Text>
-              {pulse.aiCited.cited}/{pulse.aiCited.total}
-            </Text>
-          )}
-          {pulse.topOpportunity && (
+    if (!isWide) {
+      return (
+        <Box flexDirection="column">
+          <Box justifyContent="space-between">
             <Text wrap="truncate-end">
-              <Text dimColor>  opportunity </Text>"{pulse.topOpportunity.query}" #{Math.round(pulse.topOpportunity.position)}
+              <Text color="claude">◆ </Text>
+              <Text bold>{pulse.domain}</Text>
+              <Text color="subtle">  clicks </Text>
+              <Text bold>{compact(pulse.clicks7)}</Text>
+              {delta(pulse.clicksDelta)}
+              <Text color="subtle">  impr </Text>
+              <Text bold>{compact(pulse.impressions7)}</Text>
+              {delta(pulse.impressionsDelta)}
             </Text>
-          )}
-          {pulse.syncedTo && <Text dimColor>  · data to {pulse.syncedTo}</Text>}
+            {controls}
+          </Box>
+          {opportunity}
         </Box>
+      )
+    }
+
+    const stat = (key: string, label: string, value: string, extra: unknown, line?: string) => (
+      <Box key={key} flexDirection="column" minWidth={16}>
+        <Text color="subtle">{label}</Text>
+        <Text>
+          <Text bold>{value}</Text>
+          {extra as never}
+        </Text>
+        <Text color="suggestion">{line ?? ' '}</Text>
       </Box>
+    )
+    const ratio = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0)
+
+    return card(
+      <Box flexDirection="column">
+        {header(pulse.domain, note)}
+        <Box gap={3} marginTop={1}>
+          {stat('clicks', 'CLICKS · 7D', compact(pulse.clicks7), delta(pulse.clicksDelta), sparkline(pulse.clicksDaily))}
+          {stat('impressions', 'IMPRESSIONS · 7D', compact(pulse.impressions7), delta(pulse.impressionsDelta), sparkline(pulse.impressionsDaily))}
+          {pulse.avgPosition !== null && stat('position', 'AVG POSITION', String(pulse.avgPosition), null, 'last 30 days')}
+          {pulse.tracked &&
+            stat(
+              'tracked',
+              'TRACKED KEYWORDS',
+              `${pulse.tracked.ranking}/${pulse.tracked.total}`,
+              <Text>
+                {pulse.tracked.up > 0 && <Text color="success"> ▲{pulse.tracked.up}</Text>}
+                {pulse.tracked.down > 0 && <Text color="error"> ▼{pulse.tracked.down}</Text>}
+              </Text>,
+              'ranking in top 100',
+            )}
+          {pulse.aiCited &&
+            stat(
+              'ai',
+              'AI CITATIONS',
+              `${pulse.aiCited.cited}/${pulse.aiCited.total}`,
+              <Text color="subtle"> {ratio(pulse.aiCited.cited, pulse.aiCited.total)}%</Text>,
+              'latest check',
+            )}
+        </Box>
+        {opportunity}
+      </Box>,
     )
   })
 }
